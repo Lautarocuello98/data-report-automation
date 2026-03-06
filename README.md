@@ -1,4 +1,4 @@
-# 📊 Data Report Automation
+# 📊 Excel Report Generator
 
 > Python CLI tool that transforms raw sales files (CSV/XLSX) into a clean dataset, business KPIs, charts, and a formatted Excel report.
 

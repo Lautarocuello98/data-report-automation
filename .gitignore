@@ -10,3 +10,5 @@ venv/
 reports/
 
 *.log
+.pytest_cache/
+.coverage

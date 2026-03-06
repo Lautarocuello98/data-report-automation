@@ -36,7 +36,7 @@ def clean_sales_df(df: pd.DataFrame, config: dict[str, Any]) -> tuple[pd.DataFra
     # Strip strings
     if cfg.get("strip_strings", True):
         for c in ["sku", "product"]:
-            out[c] = out[c].astype(str).str.strip()
+            out[c] = out[c].astype("string").str.strip()
         summary["strip_strings"] = True
 
     # Parse date
@@ -69,7 +69,11 @@ def clean_sales_df(df: pd.DataFrame, config: dict[str, Any]) -> tuple[pd.DataFra
 
     # Basic sanity: keep only rows with non-empty SKU or product
     before = len(out)
-    out = out[(out["sku"].astype(str).str.len() > 0) | (out["product"].astype(str).str.len() > 0)].copy()
+    invalid_text = {"", "nan", "none", "null", "<na>"}
+    sku_norm = out["sku"].astype("string").fillna("").str.strip().str.lower()
+    product_norm = out["product"].astype("string").fillna("").str.strip().str.lower()
+    keep_mask = (~sku_norm.isin(invalid_text)) | (~product_norm.isin(invalid_text))
+    out = out[keep_mask].copy()
     summary["dropped_empty_identity_rows"] = before - len(out)
 
     # Order columns nicely

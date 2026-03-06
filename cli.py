@@ -66,7 +66,18 @@ def main() -> int:
     logging.info("Cleaning summary: %s", cleaning_summary)
 
     kpis = compute_kpis(df_clean)
-    logging.info("KPIs computed: %s", {k: v for k, v in kpis.items() if k != "top_products"})
+    top_products = kpis.get("top_products")
+    top_products_count = int(len(top_products)) if top_products is not None else 0
+    kpis_for_log = {
+        "total_orders": int(kpis.get("total_orders", 0)),
+        "total_units": float(kpis.get("total_units", 0.0)),
+        "total_revenue": float(kpis.get("total_revenue", 0.0)),
+        "total_cost": float(kpis.get("total_cost", 0.0)),
+        "total_profit": float(kpis.get("total_profit", 0.0)),
+        "avg_order_value": float(kpis.get("avg_order_value", 0.0)),
+        "top_products_count": top_products_count,
+    }
+    logging.info("KPIs computed: %s", kpis_for_log)
 
     charts_dir = output_dir / "charts"
     chart_files = []

@@ -2,6 +2,7 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
+from src.charts import build_charts
 from src.processor import compute_kpis
 from src.report_generator import generate_excel_report
 
@@ -26,6 +27,7 @@ def test_generate_excel_report_creates_file(tmp_path: Path, sample_df):
 def test_generate_excel_report_formats_currency_cells(tmp_path: Path, sample_df):
     kpis = compute_kpis(sample_df)
     out = tmp_path / "out.xlsx"
+    chart_files = build_charts(sample_df, kpis, tmp_path / "charts")
 
     generate_excel_report(
         report_path=out,
@@ -33,15 +35,19 @@ def test_generate_excel_report_formats_currency_cells(tmp_path: Path, sample_df)
         kpis=kpis,
         currency="USD",
         sources=["sample.csv"],
-        chart_files=[],
+        chart_files=chart_files,
     )
 
     wb = load_workbook(out)
     summary = wb["Summary"]
-    money_fmt = summary["B5"].number_format  # Total Revenue
+    money_fmt = summary["E6"].number_format  # Total Revenue card value
 
+    assert str(summary["A1"].value).startswith("Sales Performance Dashboard")
     assert "$" in money_fmt
     assert "#,##0.00" in money_fmt
+    assert "Charts" in wb.sheetnames
+    assert "Product Performance" in wb.sheetnames
+    assert "Daily Performance" in wb.sheetnames
 
     cleaned = wb["Cleaned Data"]
     cleaned_headers = {

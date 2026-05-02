@@ -74,10 +74,10 @@ def _apply_number_format_to_column(ws, col_idx: int, number_format: str, start_r
         ws.cell(row=row_idx, column=col_idx).number_format = number_format
 
 
-def _header_positions(ws) -> dict[str, int]:
+def _header_positions(ws, header_row: int = 1) -> dict[str, int]:
     headers: dict[str, int] = {}
     for col_idx in range(1, ws.max_column + 1):
-        value = ws.cell(row=1, column=col_idx).value
+        value = ws.cell(row=header_row, column=col_idx).value
         if value is not None:
             headers[str(value).strip()] = col_idx
     return headers
@@ -149,10 +149,19 @@ def _merge_block(
         cell.number_format = number_format
 
 
-def _auto_fit_widths(ws, *, min_width: int = 12, max_width: int = 28, extra: int = 2) -> None:
+def _auto_fit_widths(
+    ws,
+    *,
+    min_width: int = 12,
+    max_width: int = 28,
+    extra: int = 2,
+    max_col: int | None = None,
+) -> None:
     widths: dict[int, int] = {}
     for row in ws.iter_rows():
         for cell in row:
+            if max_col is not None and cell.column > max_col:
+                continue
             if cell.value is None:
                 continue
             text_length = len(str(cell.value))
@@ -161,16 +170,25 @@ def _auto_fit_widths(ws, *, min_width: int = 12, max_width: int = 28, extra: int
         ws.column_dimensions[get_column_letter(col_idx)].width = width
 
 
-def _style_table(ws) -> None:
-    if ws.max_row == 0 or ws.max_column == 0:
+def _style_table(
+    ws,
+    *,
+    header_row: int = 1,
+    end_col: int | None = None,
+    end_row: int | None = None,
+) -> None:
+    table_end_col = end_col or ws.max_column
+    table_end_row = end_row or ws.max_row
+    if table_end_row < header_row or table_end_col <= 0:
         return
 
     ws.sheet_view.showGridLines = False
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = ws.dimensions
-    ws.row_dimensions[1].height = 24
+    ws.freeze_panes = f"A{header_row + 1}"
+    ws.auto_filter.ref = f"A{header_row}:{get_column_letter(table_end_col)}{table_end_row}"
+    ws.row_dimensions[header_row].height = 24
 
-    for cell in ws[1]:
+    for col_idx in range(1, table_end_col + 1):
+        cell = ws.cell(row=header_row, column=col_idx)
         cell.fill = PatternFill("solid", fgColor=PALETTE["navy"])
         cell.font = Font(color=PALETTE["white"], bold=True)
         cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -178,9 +196,9 @@ def _style_table(ws) -> None:
 
     band_a = PatternFill("solid", fgColor=PALETTE["white"])
     band_b = PatternFill("solid", fgColor=PALETTE["mist"])
-    for row_idx in range(2, ws.max_row + 1):
+    for row_idx in range(header_row + 1, table_end_row + 1):
         fill = band_a if row_idx % 2 == 0 else band_b
-        for col_idx in range(1, ws.max_column + 1):
+        for col_idx in range(1, table_end_col + 1):
             cell = ws.cell(row=row_idx, column=col_idx)
             cell.fill = fill
             cell.border = THIN_BORDER
@@ -195,6 +213,216 @@ def _format_date_label(value: str | None) -> str:
         return pd.to_datetime(value).strftime("%b %d, %Y")
     except Exception:
         return str(value)
+
+
+def _write_dataframe_rows(ws, df: pd.DataFrame, *, start_row: int) -> None:
+    for row_idx, row in enumerate(dataframe_to_rows(df, index=False, header=True), start=start_row):
+        for col_idx, value in enumerate(row, start=1):
+            ws.cell(row=row_idx, column=col_idx, value=value)
+
+
+def _top_group_label(count: int, *, title_case: bool = False) -> str:
+    if count <= 0:
+        return "products"
+    prefix = "top"
+    noun = "product" if count == 1 else "products"
+    label = f"{prefix} {count} {noun}"
+    return label.title() if title_case else label
+
+
+def _top_group_verb(count: int) -> str:
+    return "contributes" if count == 1 else "contribute"
+
+
+def _counted_products(count: int) -> str:
+    noun = "product" if count == 1 else "products"
+    return f"{count} {noun}"
+
+
+def _margin_position(margin_pct: float) -> str:
+    if margin_pct < 0:
+        return "loss-making economics"
+    if margin_pct >= 35:
+        return "strong profitability"
+    if margin_pct >= 20:
+        return "healthy profitability"
+    if margin_pct > 0:
+        return "positive but thin profitability"
+    return "break-even performance"
+
+
+def _margin_signal(margin_pct: float) -> str:
+    if margin_pct < 0:
+        return "Margin is negative"
+    if margin_pct >= 35:
+        return "Margin is strong"
+    if margin_pct >= 20:
+        return "Margin is healthy"
+    if margin_pct > 0:
+        return "Margin is thin"
+    return "Margin is at break-even"
+
+
+def _concentration_profile(kpis: dict) -> dict[str, int | float | str]:
+    available_products = int(kpis.get("ranked_products_count", 0) or 0)
+    top_count = min(3, available_products) if available_products else 0
+    top_product_share = float(kpis.get("top_product_share", 0.0))
+    top_3_share = float(kpis.get("top_3_products_share", 0.0))
+
+    if available_products <= 0:
+        level = "unknown"
+    elif available_products <= 3:
+        level = "narrow"
+    elif top_3_share >= 75 or top_product_share >= 45:
+        level = "high"
+    elif top_3_share >= 55 or top_product_share >= 30:
+        level = "medium"
+    else:
+        level = "balanced"
+
+    return {
+        "available_products": available_products,
+        "top_count": top_count,
+        "top_product_share": top_product_share,
+        "top_3_share": top_3_share,
+        "level": level,
+    }
+
+
+def _concentration_clause(kpis: dict) -> str:
+    profile = _concentration_profile(kpis)
+    available_products = int(profile["available_products"])
+    top_count = int(profile["top_count"])
+    top_3_share = float(profile["top_3_share"])
+    level = str(profile["level"])
+
+    if level == "unknown":
+        return "product concentration could not be assessed from the available data"
+    if level == "narrow":
+        return f"only {_counted_products(available_products)} are represented, so the mix is naturally concentrated"
+    if level == "high":
+        return (
+            f"{_top_group_label(top_count)} {_top_group_verb(top_count)} {top_3_share:.1f}% "
+            "of revenue, indicating high dependence on a few products"
+        )
+    if level == "medium":
+        return (
+            f"{_top_group_label(top_count)} {_top_group_verb(top_count)} {top_3_share:.1f}% "
+            "of revenue, so a few products are carrying most sales"
+        )
+    return (
+        f"{_top_group_label(top_count)} {_top_group_verb(top_count)} {top_3_share:.1f}% "
+        "of revenue, suggesting a balanced product mix"
+    )
+
+
+def _build_executive_summary_text(kpis: dict, currency: str) -> str:
+    total_revenue = float(kpis.get("total_revenue", 0.0))
+    total_profit = float(kpis.get("total_profit", 0.0))
+    total_orders = int(kpis.get("total_orders", 0))
+    margin_pct = float(kpis.get("margin_pct", 0.0))
+    best_product = kpis.get("best_product") or {}
+    best_day = kpis.get("best_day") or {}
+    top_product_name = str(best_product.get("product", "N/A"))
+    top_product_revenue = float(best_product.get("revenue", 0.0))
+    top_product_share = float(kpis.get("top_product_share", 0.0))
+    peak_day_share = float(kpis.get("peak_day_share", 0.0))
+
+    if total_orders == 0 and total_revenue == 0:
+        return (
+            "No commercial activity is available in the current dataset, so revenue, profitability, "
+            "and peak-day signals are limited."
+        )
+
+    summary_lines = [
+        (
+            f"Revenue reached {_currency_text(total_revenue, currency)} across {total_orders:,} orders, "
+            f"generating {_currency_text(total_profit, currency)} in profit at a {margin_pct:.1f}% margin, "
+            f"which points to {_margin_position(margin_pct)}."
+        )
+    ]
+
+    if top_product_revenue > 0:
+        summary_lines.append(
+            f"{top_product_name} led the catalog with {_currency_text(top_product_revenue, currency)} "
+            f"({top_product_share:.1f}% of revenue); {_concentration_clause(kpis)}."
+        )
+    else:
+        summary_lines.append(f"{_concentration_clause(kpis).capitalize()}.")
+
+    if best_day:
+        summary_lines.append(
+            f"Peak day was {_format_date_label(best_day.get('date'))} with "
+            f"{_currency_text(float(best_day.get('revenue', 0.0)), currency)} in revenue "
+            f"({peak_day_share:.1f}% of the period total)."
+        )
+    else:
+        summary_lines.append(
+            "Peak-day performance could not be assessed because the dataset does not contain valid dates."
+        )
+
+    return " ".join(summary_lines)
+
+
+def _build_summary_insight_text(kpis: dict) -> str:
+    total_orders = int(kpis.get("total_orders", 0))
+    total_revenue = float(kpis.get("total_revenue", 0.0))
+    margin_pct = float(kpis.get("margin_pct", 0.0))
+    profile = _concentration_profile(kpis)
+    top_count = int(profile["top_count"])
+    top_3_share = float(profile["top_3_share"])
+    available_products = int(profile["available_products"])
+    level = str(profile["level"])
+
+    if total_orders == 0 and total_revenue == 0:
+        return "The dataset is too limited to support a business conclusion."
+
+    margin_part = _margin_signal(margin_pct)
+    if level == "unknown":
+        return f"{margin_part}, and product concentration cannot be assessed from the available detail."
+    if level == "narrow":
+        return f"{margin_part}, but the mix is narrow because only {_counted_products(available_products)} are represented."
+    if level == "high":
+        return (
+            f"{margin_part}, but revenue is highly concentrated: "
+            f"{_top_group_label(top_count)} {_top_group_verb(top_count)} {top_3_share:.1f}% of sales."
+        )
+    if level == "medium":
+        return (
+            f"{margin_part}, and a few products are doing most of the work: "
+            f"{_top_group_label(top_count)} {_top_group_verb(top_count)} {top_3_share:.1f}% of sales."
+        )
+    return (
+        f"{margin_part}, and revenue is reasonably diversified: "
+        f"{_top_group_label(top_count)} {_top_group_verb(top_count)} {top_3_share:.1f}% of sales."
+    )
+
+
+def _build_top_products_insight_text(kpis: dict) -> str:
+    profile = _concentration_profile(kpis)
+    top_count = int(profile["top_count"])
+    top_3_share = float(profile["top_3_share"])
+    available_products = int(profile["available_products"])
+    level = str(profile["level"])
+
+    if level == "unknown":
+        return "Not enough product-level revenue is available to assess concentration."
+    if level == "narrow":
+        return f"Only {_counted_products(available_products)} appear in the dataset, so the sales mix is naturally concentrated."
+    if level == "high":
+        return (
+            f"{_top_group_label(top_count)} {_top_group_verb(top_count)} {top_3_share:.1f}% of revenue, "
+            "so a small set of products is carrying the business."
+        )
+    if level == "medium":
+        return (
+            f"{_top_group_label(top_count)} {_top_group_verb(top_count)} {top_3_share:.1f}% of revenue, "
+            "showing moderate concentration in the catalog."
+        )
+    return (
+        f"{_top_group_label(top_count)} {_top_group_verb(top_count)} {top_3_share:.1f}% of revenue, "
+        "suggesting a balanced product mix."
+    )
 
 
 def _write_dataframe_sheet(
@@ -367,7 +595,18 @@ def _build_summary_sheet(
     generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     top_product_name = str(best_product.get("product", "N/A"))
     top_product_revenue = float(best_product.get("revenue", 0.0))
-    top_product_share = (top_product_revenue / total_revenue * 100) if total_revenue else 0.0
+    top_product_share = float(kpis.get("top_product_share", 0.0))
+    summary_insight = _build_summary_insight_text(kpis)
+    peak_day_note = (
+        f"{_currency_text(float(best_day.get('revenue', 0.0)), currency)} generated"
+        if best_day
+        else "No valid dates available"
+    )
+    revenue_leader_note = (
+        f"{_currency_text(top_product_revenue, currency)} in revenue"
+        if top_product_revenue > 0
+        else "No product revenue available"
+    )
 
     ws.title = "Summary"
     ws.sheet_view.showGridLines = False
@@ -500,13 +739,7 @@ def _build_summary_sheet(
         alignment=Alignment(horizontal="left", vertical="center"),
     )
     executive_summary = (
-        f"This reporting window generated {_currency_text(total_revenue, currency)} in revenue from "
-        f"{total_orders:,} orders and {total_units:,.0f} units. Profit closed at "
-        f"{_currency_text(total_profit, currency)} with an overall margin of {margin_pct:.1f}%.\n\n"
-        f"The catalog leader was {top_product_name}, contributing {_currency_text(top_product_revenue, currency)} "
-        f"and {top_product_share:.1f}% of total revenue. "
-        f"The strongest day landed on {_format_date_label(best_day.get('date'))}, reaching "
-        f"{_currency_text(float(best_day.get('revenue', 0.0)), currency)}."
+        _build_executive_summary_text(kpis, currency)
     )
     _merge_block(
         ws,
@@ -519,30 +752,42 @@ def _build_summary_sheet(
         font=Font(color=PALETTE["navy"], size=11),
         alignment=Alignment(horizontal="left", vertical="top", wrap_text=True),
     )
+    _merge_block(
+        ws,
+        20,
+        20,
+        1,
+        12,
+        f"So What? {summary_insight}",
+        fill_color=PALETTE["sky"],
+        font=Font(color=PALETTE["navy"], bold=True, italic=True, size=10),
+        alignment=Alignment(horizontal="left", vertical="center", wrap_text=True),
+    )
+    ws.row_dimensions[19].height = 8
 
     _write_insight_tile(
         ws,
-        start_row=20,
+        start_row=21,
         start_col=1,
         end_col=3,
         title="Revenue Leader",
         value=top_product_name,
-        note=f"{_currency_text(top_product_revenue, currency)} in revenue",
+        note=revenue_leader_note,
         fill_color=PALETTE["sky"],
     )
     _write_insight_tile(
         ws,
-        start_row=20,
+        start_row=21,
         start_col=4,
         end_col=6,
         title="Peak Day",
         value=_format_date_label(best_day.get("date")),
-        note=f"{_currency_text(float(best_day.get('revenue', 0.0)), currency)} generated",
+        note=peak_day_note,
         fill_color=PALETTE["mint"],
     )
     _write_insight_tile(
         ws,
-        start_row=20,
+        start_row=21,
         start_col=7,
         end_col=9,
         title="Revenue Share",
@@ -552,7 +797,7 @@ def _build_summary_sheet(
     )
     _write_insight_tile(
         ws,
-        start_row=20,
+        start_row=21,
         start_col=10,
         end_col=12,
         title="Catalog Spread",
@@ -602,6 +847,152 @@ def _build_summary_sheet(
         )
 
 
+def _build_top_products_sheet(
+    wb: Workbook,
+    *,
+    product_performance: pd.DataFrame,
+    kpis: dict,
+    currency: str,
+) -> None:
+    ws = wb.create_sheet("Top Products")
+    ws.sheet_view.showGridLines = False
+    ws.sheet_properties.tabColor = PALETTE["amber"]
+    _set_col_widths(ws, {get_column_letter(col): 14 for col in range(1, 13)})
+    _fill_range(
+        ws,
+        1,
+        40,
+        1,
+        12,
+        fill=PatternFill("solid", fgColor=PALETTE["mist"]),
+    )
+
+    top_count = min(int(kpis.get("ranked_products_count", 0) or 0), 3)
+    top_group_title = _top_group_label(top_count, title_case=True) if top_count else "Top Products"
+    top_3_revenue = float(kpis.get("top_3_products_revenue", 0.0))
+    top_3_share = float(kpis.get("top_3_products_share", 0.0))
+    best_product = kpis.get("best_product") or {}
+    top_product_name = str(best_product.get("product", "N/A"))
+    top_product_revenue = float(best_product.get("revenue", 0.0))
+    top_product_share = float(kpis.get("top_product_share", 0.0))
+
+    _merge_block(
+        ws,
+        1,
+        2,
+        1,
+        12,
+        "Top Product Performance",
+        fill_color=PALETTE["navy"],
+        font=Font(color=PALETTE["white"], bold=True, size=20),
+        alignment=Alignment(horizontal="center", vertical="center"),
+    )
+    _merge_block(
+        ws,
+        3,
+        3,
+        1,
+        12,
+        "Revenue contribution and concentration across the leading products.",
+        fill_color=PALETTE["slate"],
+        font=Font(color=PALETTE["white"], size=10),
+        alignment=Alignment(horizontal="center", vertical="center"),
+    )
+
+    _write_kpi_card(
+        ws,
+        start_row=5,
+        start_col=1,
+        end_col=4,
+        title=f"{top_group_title} Revenue",
+        value=top_3_revenue,
+        note="Combined revenue from the leading products",
+        fill_color=PALETTE["navy"],
+        number_format=_currency_number_format(currency),
+    )
+    _write_kpi_card(
+        ws,
+        start_row=5,
+        start_col=5,
+        end_col=8,
+        title=f"{top_group_title} Share",
+        value=top_3_share,
+        note="Share of total revenue",
+        fill_color=PALETTE["blue"],
+        number_format='0.0"%"',
+    )
+    _write_insight_tile(
+        ws,
+        start_row=5,
+        start_col=9,
+        end_col=12,
+        title="Revenue Leader",
+        value=top_product_name,
+        note=(
+            f"{_currency_text(top_product_revenue, currency)} | {top_product_share:.1f}% of sales"
+            if top_product_revenue > 0
+            else "No leading product identified"
+        ),
+        fill_color=PALETTE["mint"],
+    )
+
+    _merge_block(
+        ws,
+        10,
+        10,
+        1,
+        12,
+        "Product Concentration",
+        fill_color=PALETTE["navy"],
+        font=Font(color=PALETTE["white"], bold=True, size=12),
+        alignment=Alignment(horizontal="left", vertical="center"),
+    )
+    _merge_block(
+        ws,
+        11,
+        12,
+        1,
+        12,
+        _build_top_products_insight_text(kpis),
+        fill_color=PALETTE["white"],
+        font=Font(color=PALETTE["navy"], size=11),
+        alignment=Alignment(horizontal="left", vertical="center", wrap_text=True),
+    )
+
+    top_products_df = product_performance.head(10).copy()
+    if top_products_df.empty:
+        _merge_block(
+            ws,
+            14,
+            16,
+            1,
+            12,
+            "No product-level sales rows are available for ranking.",
+            fill_color=PALETTE["white"],
+            font=Font(color=PALETTE["navy"], size=11),
+            alignment=Alignment(horizontal="left", vertical="center", wrap_text=True),
+        )
+        return
+
+    table_start_row = 14
+    table_end_col = len(top_products_df.columns)
+    table_end_row = table_start_row + len(top_products_df)
+    _write_dataframe_rows(ws, top_products_df, start_row=table_start_row)
+    headers = _header_positions(ws, header_row=table_start_row)
+    for col_name in ["revenue", "cost", "profit"]:
+        if col_name in headers:
+            _apply_number_format_to_column(ws, headers[col_name], _currency_number_format(currency), start_row=table_start_row + 1)
+    if "margin_pct" in headers:
+        _apply_number_format_to_column(ws, headers["margin_pct"], '0.0"%"', start_row=table_start_row + 1)
+    if "total_units" in headers:
+        _apply_number_format_to_column(ws, headers["total_units"], "#,##0.00", start_row=table_start_row + 1)
+    if "order_count" in headers:
+        _apply_number_format_to_column(ws, headers["order_count"], "#,##0", start_row=table_start_row + 1)
+
+    _style_table(ws, header_row=table_start_row, end_col=table_end_col, end_row=table_end_row)
+    _auto_fit_widths(ws, max_col=table_end_col)
+
+
 def _build_charts_sheet(wb: Workbook, chart_files: list[Path]) -> None:
     if not chart_files:
         return
@@ -624,7 +1015,7 @@ def _build_charts_sheet(wb: Workbook, chart_files: list[Path]) -> None:
         2,
         1,
         14,
-        "Chart Gallery",
+        "Sales Performance Breakdown",
         fill_color=PALETTE["navy"],
         font=Font(color=PALETTE["white"], bold=True, size=20),
         alignment=Alignment(horizontal="center", vertical="center"),
@@ -641,7 +1032,7 @@ def _build_charts_sheet(wb: Workbook, chart_files: list[Path]) -> None:
         alignment=Alignment(horizontal="center", vertical="center"),
     )
 
-    anchors = ["A5", "H5", "A24", "H24"]
+    anchors = ["A6", "H6", "A25", "H25"]
     for image_path, anchor in zip(chart_files[:4], anchors, strict=False):
         _embed_chart(ws, image_path, anchor, width=600, height=320)
 
@@ -699,18 +1090,17 @@ def generate_excel_report(
     )
 
     product_performance = kpis.get("product_performance")
-    if isinstance(product_performance, pd.DataFrame) and not product_performance.empty:
-        top_products_df = product_performance.head(10).copy()
-        _write_dataframe_sheet(
-            wb,
-            "Top Products",
-            top_products_df,
-            currency_fmt=currency_fmt,
-            currency_cols=["revenue", "cost", "profit"],
-            percent_cols=["margin_pct"],
-            decimal_cols=["total_units"],
-            integer_cols=["order_count"],
+    if not isinstance(product_performance, pd.DataFrame):
+        product_performance = pd.DataFrame(
+            columns=["product", "order_count", "total_units", "revenue", "cost", "profit", "margin_pct"]
         )
+    _build_top_products_sheet(
+        wb,
+        product_performance=product_performance,
+        kpis=kpis,
+        currency=currency,
+    )
+    if not product_performance.empty:
         _write_dataframe_sheet(
             wb,
             "Product Performance",

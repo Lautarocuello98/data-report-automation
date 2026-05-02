@@ -17,7 +17,12 @@ def test_compute_kpis(sample_df):
     assert kpis["date_start"] == "2026-01-01"
     assert kpis["date_end"] == "2026-01-02"
     assert kpis["best_product"]["revenue"] == 20.0
+    assert kpis["top_product_share"] == 50.0
+    assert kpis["top_3_products_revenue"] == 40.0
+    assert kpis["top_3_products_share"] == 100.0
+    assert kpis["ranked_products_count"] == 2
     assert kpis["best_day"]["revenue"] == 20.0
+    assert kpis["peak_day_share"] == 50.0
     assert list(kpis["product_performance"].columns) == [
         "product",
         "order_count",

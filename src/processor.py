@@ -3,6 +3,13 @@ from __future__ import annotations
 import pandas as pd
 
 
+def _product_label(value: object) -> str:
+    if pd.isna(value):
+        return "Unspecified Product"
+    text = str(value).strip()
+    return text or "Unspecified Product"
+
+
 def compute_kpis(df: pd.DataFrame) -> dict:
     """
     Compute core KPIs from cleaned sales data.
@@ -41,6 +48,7 @@ def compute_kpis(df: pd.DataFrame) -> dict:
         .reset_index()
     )
     if not product_performance.empty:
+        product_performance["product"] = product_performance["product"].map(_product_label)
         product_performance["margin_pct"] = (
             product_performance["profit"]
             .div(product_performance["revenue"].where(product_performance["revenue"] != 0))
@@ -65,6 +73,23 @@ def compute_kpis(df: pd.DataFrame) -> dict:
         )
 
     top_products = product_performance.loc[:, ["product", "revenue"]].head(10).copy()
+    ranked_products_count = int(len(product_performance))
+    top_product_share = 0.0
+    top_3_products_revenue = 0.0
+    top_3_products_share = 0.0
+
+    if ranked_products_count:
+        top_product_share = (
+            float(product_performance.iloc[0]["revenue"] / total_revenue * 100)
+            if total_revenue
+            else 0.0
+        )
+        top_3_products_revenue = float(product_performance.head(3)["revenue"].sum())
+        top_3_products_share = (
+            float(top_3_products_revenue / total_revenue * 100)
+            if total_revenue
+            else 0.0
+        )
 
     daily_performance = pd.DataFrame(
         columns=["date", "orders", "units", "revenue", "cost", "profit", "margin_pct"]
@@ -72,6 +97,7 @@ def compute_kpis(df: pd.DataFrame) -> dict:
     date_start = None
     date_end = None
     best_day = None
+    peak_day_share = 0.0
 
     if "date" in out.columns:
         dated = out.copy()
@@ -108,6 +134,9 @@ def compute_kpis(df: pd.DataFrame) -> dict:
                 "revenue": float(best_day_row["revenue"]),
                 "profit": float(best_day_row["profit"]),
             }
+            peak_day_share = (
+                float(best_day["revenue"] / total_revenue * 100) if total_revenue else 0.0
+            )
 
     best_product = None
     if not product_performance.empty:
@@ -132,8 +161,13 @@ def compute_kpis(df: pd.DataFrame) -> dict:
         "date_start": date_start,
         "date_end": date_end,
         "best_product": best_product,
+        "top_product_share": top_product_share,
         "best_day": best_day,
+        "peak_day_share": peak_day_share,
         "top_products": top_products,
+        "ranked_products_count": ranked_products_count,
+        "top_3_products_revenue": top_3_products_revenue,
+        "top_3_products_share": top_3_products_share,
         "product_performance": product_performance,
         "daily_performance": daily_performance,
         "df_with_calculations": out,

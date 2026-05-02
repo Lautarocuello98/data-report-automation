@@ -2,7 +2,7 @@
 
 > Python CLI tool that transforms raw sales files (CSV/XLSX) into a polished Excel dashboard with business KPIs, analysis sheets, and presentation-ready charts.
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests: pytest](https://img.shields.io/badge/tests-pytest-green.svg)](#tests)
 
@@ -10,23 +10,23 @@
 
 ## Overview
 
-This project automates a complete reporting workflow:
+This project automates a full reporting workflow:
 
-1. Load one file or a full folder of source files
-2. Normalize columns and clean records
-3. Compute business KPIs and performance breakdowns
-4. Generate branded visual charts
-5. Export everything to a portfolio-ready Excel workbook
+1. Load one CSV/XLSX file or a full folder of files
+2. Normalize source columns using configurable aliases
+3. Clean and validate sales records
+4. Compute business KPIs and performance breakdowns
+5. Generate charts and export a polished Excel workbook
 
-The final deliverable is no longer just a spreadsheet dump. It is a structured reporting asset with:
+The goal is not to produce a plain spreadsheet dump. The generated workbook is designed to feel like a compact business reporting tool.
 
-- A dashboard-style summary sheet
-- KPI cards and executive summary text
-- Product and daily performance breakdowns
-- A dedicated chart gallery
-- Cleaned data ready for audit or handoff
+## Reporting Highlights
 
----
+- Executive Summary with revenue, orders, profit, margin, top-product contribution, and peak-day performance
+- "So What?" insight on the Summary sheet that translates metrics into a short business takeaway
+- Top Products sheet with top 3 revenue, top 3 revenue share, and product concentration commentary
+- Sales Performance Breakdown sheet with embedded charts for fast visual review
+- Cleaned Data, Product Performance, and Daily Performance sheets for audit and analysis
 
 ## Quick Start
 
@@ -37,59 +37,38 @@ pip install -r requirements.txt
 python cli.py --input data/sample_sales.csv --output reports
 ```
 
----
-
 ## Example
 
 ### Input
 
-Example dataset used as source input.
+Example source dataset:
 
-![CSV Example](images/csv_input.png)
+![CSV input example](images/csv_input.png)
 
----
+### Generated Workbook Preview
 
-### Final Excel Preview
+The screenshots below show the current output style of the generated Excel report.
 
-The generated workbook now includes a stronger visual presentation across the summary, analysis sheets, and chart gallery.
-
-| Dashboard Summary | Product Analysis |
+| Executive Summary | Top Products |
 | --- | --- |
-| ![Excel Dashboard](images/example_excel_1.png) | ![Excel Product Analysis](images/example_excel_2.png) |
+| ![Executive Summary](images/image1.png) | ![Top Products](images/image2.png) |
 
-| Daily Performance | Chart Gallery |
+| Daily Performance | Sales Performance Breakdown |
 | --- | --- |
-| ![Excel Daily Performance](images/example_excel_3.png) | ![Excel Chart Gallery](images/example_excel_4.png) |
-
----
-
-## Features
-
-| Feature | Description |
-| --- | --- |
-| Multi-file ingestion | Process a single file or an entire folder |
-| Data cleaning | Normalize values, remove duplicates, validate records |
-| KPI engine | Revenue, cost, profit, margin, average order value, top performers |
-| Executive summary | Auto-generated business summary in the main dashboard |
-| Multi-sheet Excel output | Summary, cleaned data, top products, product performance, daily performance, charts |
-| Visual storytelling | Embedded charts and gallery-ready reporting visuals |
-| Logging | Full processing log in `processing.log` |
-| Tests | Automated coverage with `pytest` |
-
----
+| ![Daily Performance](images/image3.png) | ![Sales Performance Breakdown](images/image4.png) |
 
 ## Workbook Output
 
-The generated Excel report includes these sheets:
+The generated `sales_report.xlsx` includes these sheets:
 
 | Sheet | Purpose |
 | --- | --- |
-| `Summary` | Dashboard cover with KPI cards, executive summary, insights, and embedded visuals |
-| `Cleaned Data` | Final normalized dataset with calculated columns |
-| `Top Products` | Top-performing products ranked by revenue |
-| `Product Performance` | Full product-level business breakdown |
-| `Daily Performance` | Day-by-day sales and profitability view |
-| `Charts` | Dedicated gallery of generated charts |
+| `Summary` | KPI dashboard with executive summary, "So What?" insight, and embedded visuals |
+| `Cleaned Data` | Normalized dataset with calculated revenue, cost, profit, and margin fields |
+| `Top Products` | Top 3 revenue metrics, revenue-share insight, and ranked leading products |
+| `Product Performance` | Full product-level performance table |
+| `Daily Performance` | Day-by-day orders, revenue, profit, and margin view |
+| `Charts` | Sales Performance Breakdown gallery with generated charts |
 
 Generated chart assets:
 
@@ -98,131 +77,32 @@ Generated chart assets:
 - `profit_by_product.png`
 - `revenue_mix.png`
 
----
+## Features
 
-## Architecture
-
-Execution pipeline:
-
-```text
-cli.py
-  -> src/loader.py           (load and merge input files)
-  -> src/cleaner.py          (validate and normalize data)
-  -> src/processor.py        (compute KPIs and performance tables)
-  -> src/charts.py           (generate styled chart assets)
-  -> src/report_generator.py (build the Excel dashboard workbook)
-```
-
-Module responsibilities:
-
-**cli.py**
-
-- CLI argument parsing
-- config loading
-- orchestration
-- logging setup
-
-**loader.py**
-
-- loads CSV/XLSX files
-- merges datasets
-- applies column mapping
-- tracks source files
-
-**cleaner.py**
-
-- validates required columns
-- removes duplicates
-- handles missing values
-- normalizes fields
-
-**processor.py**
-
-- computes totals and core business KPIs
-- builds product and daily performance tables
-- prepares summary metrics used by the dashboard
-
-**charts.py**
-
-- generates styled visual assets for the workbook
-
-**report_generator.py**
-
-- creates the final Excel report
-- builds the dashboard layout and analysis sheets
-
----
-
-## Project Structure
-
-```text
-data-report-automation/
-|
-|-- cli.py
-|-- config.json
-|-- requirements.txt
-|-- README.md
-|-- LICENSE
-|
-|-- data/
-|   |-- sample_sales.csv
-|
-|-- src/
-|   |-- loader.py
-|   |-- cleaner.py
-|   |-- processor.py
-|   |-- charts.py
-|   `-- report_generator.py
-|
-|-- tests/
-|   |-- conftest.py
-|   |-- test_loader.py
-|   |-- test_cleaner.py
-|   |-- test_processor.py
-|   |-- test_charts.py
-|   `-- test_report_generator.py
-|
-|-- images/
-|   |-- csv_input.png
-|   |-- example_excel_1.png
-|   |-- example_excel_2.png
-|   |-- example_excel_3.png
-|   `-- example_excel_4.png
-|
-`-- reports/                # generated outputs
-```
-
----
-
-## Installation
-
-### Requirements
-
-- Python `3.10+`
-- `pip`
-
-### Setup
-
-```bash
-git clone https://github.com/Lautarocuello98/data-report-automation.git
-cd data-report-automation
-pip install -r requirements.txt
-```
-
----
+| Feature | Description |
+| --- | --- |
+| Multi-file ingestion | Process one file or a folder of files |
+| Configurable mapping | Match alternate column names through `config.json` |
+| Data cleaning | Remove duplicates, coerce numeric fields, and standardize strings |
+| KPI engine | Revenue, cost, profit, margin, average order value, top products, and peak day |
+| Business commentary | Short narrative summaries generated from the actual data |
+| Excel dashboard | Multi-sheet workbook with styled cards, insights, and tables |
+| Chart export | Styled PNG charts embedded into the workbook |
+| Logging | Processing trace written to `reports/processing.log` |
+| Tests | Regression coverage with `pytest` |
 
 ## Usage
-
-Run against a folder:
-
-```bash
-python cli.py --input data --output reports
-```
 
 Run against a single file:
 
 ```bash
 python cli.py --input data/sample_sales.csv --output reports
+```
+
+Run against a folder:
+
+```bash
+python cli.py --input data --output reports
 ```
 
 Optional flags:
@@ -232,14 +112,14 @@ Optional flags:
 --verbose
 ```
 
-Expected outputs:
+## Output Files
+
+Expected output structure:
 
 ```text
 reports/
-|
 |-- sales_report.xlsx
 |-- processing.log
-|
 `-- charts/
     |-- revenue_by_day.png
     |-- top_products.png
@@ -247,17 +127,51 @@ reports/
     `-- revenue_mix.png
 ```
 
----
+## Architecture
+
+Execution pipeline:
+
+```text
+cli.py
+  -> src/loader.py
+  -> src/cleaner.py
+  -> src/processor.py
+  -> src/charts.py
+  -> src/report_generator.py
+```
+
+Module responsibilities:
+
+- `cli.py`: parses CLI args, loads config, orchestrates the pipeline, and writes logs
+- `src/loader.py`: loads CSV/XLSX files and applies column mapping
+- `src/cleaner.py`: validates and normalizes the dataset
+- `src/processor.py`: computes KPIs and summary tables
+- `src/charts.py`: creates PNG chart assets
+- `src/report_generator.py`: builds the Excel workbook layout and styling
+
+## Project Structure
+
+```text
+data-report-automation/
+|-- cli.py
+|-- config.json
+|-- requirements.txt
+|-- README.md
+|-- LICENSE
+|-- data/
+|-- images/
+|-- reports/
+|-- src/
+`-- tests/
+```
 
 ## Tests
 
-Run the automated test suite:
+Run the test suite with:
 
 ```bash
 python -m pytest -v
 ```
-
----
 
 ## Tech Stack
 
@@ -267,22 +181,14 @@ python -m pytest -v
 - matplotlib
 - pytest
 
----
-
 ## License
 
-This project is licensed under the **MIT License**.
-
-See [LICENSE](LICENSE) for details.
-
----
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
 ## Author
 
-Lautaro Cuello
-
-GitHub
-https://github.com/Lautarocuello98
+Lautaro Cuello  
+GitHub: https://github.com/Lautarocuello98
 
 ---
 

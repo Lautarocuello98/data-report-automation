@@ -1,4 +1,4 @@
-# Data Report Automation
+# 📊 Data Report Automation
 
 > Python CLI tool that transforms raw sales files (CSV/XLSX) into a polished Excel dashboard with business KPIs, analysis sheets, and presentation-ready charts.
 
@@ -283,3 +283,7 @@ Lautaro Cuello
 
 GitHub
 https://github.com/Lautarocuello98
+
+---
+
+⭐ If you found this project useful, consider giving the repository a star.
